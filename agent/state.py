@@ -23,6 +23,7 @@ class AgentState(TypedDict, total=False):
         decision_rationale: 决策理由
         final_report:      最终生成的报告
         report_format:     报告输出格式，默认 "markdown"
+        report_path:       报告 Markdown 文件保存路径
         iteration:         当前迭代轮次
         max_iterations:    最大迭代轮次
         next_step:         下一步要执行的动作名称
@@ -40,6 +41,7 @@ class AgentState(TypedDict, total=False):
     decision_rationale: str
     final_report: str
     report_format: str                   # 默认 "markdown"
+    report_path: str
     iteration: int
     max_iterations: int
     next_step: str
@@ -72,8 +74,9 @@ def create_initial_state(user_query: str) -> AgentState:
         decision_rationale="",
         final_report="",
         report_format="markdown",
+        report_path="",
         iteration=0,
-        max_iterations=5,
+        max_iterations=3,
         next_step="search",       # 默认从搜索开始
         errors=[],
     )

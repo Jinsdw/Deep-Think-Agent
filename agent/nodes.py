@@ -8,6 +8,8 @@ Deep-Think-Agent 节点模块
 import asyncio
 import json
 import re
+from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List
 
 from agent.model import call_glm
@@ -27,12 +29,9 @@ from agent.tools import fetch_page_content, web_search
 
 TOP_RESULTS_PER_QUERY = 5
 MIN_FILTERED_SOURCES = 3
+OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
 
-NEXT_ACTION_TO_STEP = {
-    "back_to_search": "search",
-    "back_to_reasoning": "reasoning",
-    "proceed": "proceed",
-}
+VALID_NEXT_STEPS = {"back_to_search", "back_to_reasoning", "proceed"}
 
 
 def _append_errors(state: AgentState, message: str) -> List[str]:
@@ -100,6 +99,13 @@ def _default_uncertainty_map(world_model: Dict[str, Any]) -> Dict[str, Dict[str,
         }
 
     return uncertainty_map
+
+
+def _build_report_path(user_query: str) -> Path:
+    slug = re.sub(r"[^\w\s\u4e00-\u9fff-]", "", user_query).strip()[:30]
+    slug = re.sub(r"\s+", "_", slug) or "report"
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return OUTPUT_DIR / f"report_{slug}_{timestamp}.md"
 
 
 async def _fetch_source_content(item: Dict[str, Any]) -> Dict[str, Any]:
@@ -441,10 +447,10 @@ async def reflection(state: AgentState) -> dict:
             raise ValueError("反思结果不是 JSON 对象")
 
         next_action = parsed.get("next_action", "proceed")
-        if next_action not in NEXT_ACTION_TO_STEP:
+        if next_action not in VALID_NEXT_STEPS:
             raise ValueError(f"无效的 next_action：{next_action}")
 
-        next_step = NEXT_ACTION_TO_STEP[next_action]
+        next_step = next_action
     except Exception as exc:
         update = {
             "iteration": iteration,
@@ -561,5 +567,19 @@ async def report_gen(state: AgentState) -> dict:
 
 
 async def report_format(state: AgentState) -> dict:
-    """设置报告输出格式为 Markdown。"""
-    return {"report_format": "markdown"}
+    """设置报告格式为 Markdown，并将报告写入 output 目录。"""
+    final_report = state.get("final_report", "")
+    report_path = ""
+
+    try:
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        path = _build_report_path(state.get("user_query", ""))
+        path.write_text(final_report, encoding="utf-8")
+        report_path = str(path)
+    except Exception as exc:
+        return {
+            "report_format": "markdown",
+            "errors": _append_errors(state, f"report_format 写入文件失败：{exc}"),
+        }
+
+    return {"report_format": "markdown", "report_path": report_path}
