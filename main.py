@@ -5,7 +5,7 @@ Deep-Think-Agent 项目入口
 
 使用示例：
     python main.py "2026年新能源汽车发展前景如何？"
-    python main.py --stream "人工智能对就业市场的影响"
+    python main.py --quiet "人工智能对就业市场的影响"   # 不显示节点进度
     python main.py   # 交互式输入问题
 """
 
@@ -13,10 +13,11 @@ import argparse
 import asyncio
 import os
 import sys
+import time
 
 from dotenv import load_dotenv
 
-from agent.graph import run_agent, run_agent_stream
+from agent.graph import NODE_LABELS, run_agent, run_agent_with_progress
 
 load_dotenv()
 
@@ -31,19 +32,17 @@ def _check_env() -> None:
         print("警告：SERPAPI_API_KEY 未配置，web_search 将使用 mock 数据。")
 
 
-async def _run_with_stream(user_query: str) -> dict:
-    final_state: dict = {"user_query": user_query}
-
-    print(f"\n问题：{user_query}\n")
-    print("=" * 60)
-
-    async for update in run_agent_stream(user_query):
-        for node_name, delta in update.items():
-            print(f"[节点完成] {node_name} -> 更新字段: {list(delta.keys())}")
-            final_state.update(delta)
-
-    print("=" * 60)
-    return final_state
+def _print_progress(step: int, node_name: str, summary: str, delta: dict) -> None:
+    label = NODE_LABELS.get(node_name, node_name)
+    print(f"  [{step:>2}] {label}")
+    print(f"       └─ {summary}")
+    if delta.get("errors") and node_name in (
+        "perception_filter",
+        "modeling_extract",
+        "reasoning_test",
+        "report_gen",
+    ):
+        print(f"       ⚠ {delta['errors'][-1]}")
 
 
 async def main() -> None:
@@ -52,9 +51,9 @@ async def main() -> None:
     parser = argparse.ArgumentParser(description="Deep-Think-Agent 深思熟虑型智能体")
     parser.add_argument("query", nargs="?", help="要分析的问题")
     parser.add_argument(
-        "--stream",
+        "--quiet",
         action="store_true",
-        help="流式输出每个节点的执行进度",
+        help="静默模式，不显示节点进度（默认开启流式进度）",
     )
     args = parser.parse_args()
 
@@ -63,13 +62,22 @@ async def main() -> None:
         print("错误：问题不能为空。")
         sys.exit(1)
 
-    if args.stream:
-        final_state = await _run_with_stream(user_query)
-    else:
-        print(f"\n正在分析问题：{user_query}\n")
-        final_state = await run_agent(user_query)
+    print(f"\n问题：{user_query}\n")
 
-    print("\n" + "=" * 60)
+    if args.quiet:
+        print("正在分析...\n")
+        final_state = await run_agent(user_query)
+    else:
+        print("=" * 60)
+        print("执行进度（节点流式输出）")
+        print("=" * 60)
+        started = time.perf_counter()
+        final_state = await run_agent_with_progress(user_query, on_progress=_print_progress)
+        elapsed = time.perf_counter() - started
+        print("=" * 60)
+        print(f"全部节点执行完毕（耗时 {elapsed:.1f}s）\n")
+
+    print("=" * 60)
     print("最终报告")
     print("=" * 60 + "\n")
     print(final_state.get("final_report", "(无报告内容)"))
