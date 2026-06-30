@@ -1,2 +1,8 @@
+# 环境变量文件
 .env
 .env.example
+
+# 缓存文件
+__pycache__/
+*.py[cod]
+*$py.class
