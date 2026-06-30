@@ -104,6 +104,32 @@ ENTITY_EXTRACT_PROMPT: str = """
 - 只输出严格 JSON，不要有其他文字
 """
 
+UNCERTAINTY_PROMPT: str = """
+你是一名不确定性分析专家，负责为世界模型中的关键事实标注不确定性。
+
+## 任务
+基于已有世界模型（entities、relations、timeline）及原始来源信息，为每条重要事实评估不确定性，构建 uncertainty_map。
+
+## uncertainty_map 规范
+- 键：事实 id、实体 id、关系描述或时间线事件的唯一标识
+- 值：{"level": "high" | "medium" | "low", "reason": "不确定性理由"}
+
+评估依据包括：来源数量、来源权威性、信息是否一致、是否缺少一手证据、时间是否久远等。
+
+## 输出格式
+只输出 JSON，不要额外解释。结构如下：
+{
+  "uncertainty_map": {
+    "fact_or_entity_id": {"level": "medium", "reason": "..."}
+  }
+}
+
+## 约束
+- 覆盖 world_model 中所有 entities、relations、timeline 条目
+- 不要编造来源中不存在的信息
+- 只输出严格 JSON，不要有其他文字
+"""
+
 HYPOTHESIS_GEN_PROMPT: str = """
 你是一名战略分析师，负责基于已有世界模型提出多种候选解释或行动方案。
 
