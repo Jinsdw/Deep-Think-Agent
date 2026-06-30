@@ -6,3 +6,6 @@
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Cursor 文件
+.cursor/
